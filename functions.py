@@ -1,4 +1,4 @@
-def mult_matrix(matrix: list) -> float:
+def det_matrix(matrix: list) -> float:
     """
     Вычисляет детерминант матрицы любого порядка
     
@@ -54,7 +54,7 @@ def mult_matrix(matrix: list) -> float:
     return determinant
 
 
-def input_matrix():
+def input_square_matrix():
     n = int(input("Введите порядок матрицы: "))
     
     print(f"Введите элементы матрицы {n}x{n} построчно:")
@@ -68,7 +68,13 @@ def input_matrix():
     
     return matrix
 
+def matrix_subtraction(matrix1, matrix2):
+    if len(matrix1) != len(matrix2) or len(matrix1[0]) != len(matrix2[0]):
+        raise ValueError("Размерности матриц не совпадают")
+    
+    return [[matrix1[i][j] - matrix2[i][j] for j in range(len(matrix1[0]))] 
+            for i in range(len(matrix1))]
 
 
-
-print(f"Determinant = {mult_matrix(input_matrix())}")
+# print(f"Determinant = {det_matrix(input_matrix())}")
+print(f"Determinant = {matrix_subtraction(input_square_matrix(), input_square_matrix())}")
