@@ -105,7 +105,14 @@ def matrix_subtraction(matrix1, matrix2):
 def algebraic_complement_matrix_compact(matrix):
     """Нахождение союзной матрицы(понадобится для нахождения обратной)
     Аргументы: matrix - матрица, для которой будет найдена союзная
-    Возвращает: союзную матрицу"""
+    Возвращает: союзную матрицу
+    
+    
+    WARNING: Нужно согласовать функцию с det_matrix
+    !!!ПЕРЕПИСАТЬ!!!
+    
+    
+    """
     n = len(matrix)
 
     # Проверка квадратности
@@ -116,7 +123,7 @@ def algebraic_complement_matrix_compact(matrix):
         """Определитель минора"""
         minor = [row[:excl_col] + row[excl_col+1:] 
                 for i, row in enumerate(mat) if i != excl_row]
-        return determinant(minor)
+        return det(minor)
     
     def det(mat):
         """Определитель матрицы"""
