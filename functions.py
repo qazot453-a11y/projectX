@@ -45,7 +45,7 @@ def det_matrix(matrix: list) -> float:
             minor.append(row)
         
         # Рекурсивно вычисляем определитель минора
-        minor_det = mult_matrix(minor)
+        minor_det = det_matrix(minor)
         
         # Добавляем к общей сумме с учетом знака
         sign = 1 if j % 2 == 0 else -1
