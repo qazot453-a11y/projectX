@@ -76,5 +76,49 @@ def matrix_subtraction(matrix1, matrix2):
             for i in range(len(matrix1))]
 
 
+def input_matrix_simple():
+    """Простая версия ввода прямоугольной матрицы"""
+    rows = int(input("Строки: "))
+    cols = int(input("Столбцы: "))
+    
+    print(f"Введите {rows} строк по {cols} чисел:")
+    matrix = []
+    
+    for i in range(rows):
+        while True:
+            try:
+                row = list(map(float, input().split()))
+                if len(row) == cols:
+                    matrix.append(row)
+                    break
+                print(f"Нужно {cols} чисел, получено {len(row)}")
+            except ValueError:
+                print("Только числа!")
+    
+    return matrix
+
+
+def print_matrix(matrix, title="Матрица"):
+    """
+    Красивый вывод матрицы
+    
+    Args:
+        matrix: матрица для вывода
+        title: заголовок
+    """
+    if not matrix:
+        print("Матрица пуста")
+        return
+    
+    print(f"\n{title} ({len(matrix)}x{len(matrix[0])}):")
+    print("─" * (len(matrix[0]) * 10))
+    
+    for row in matrix:
+        # Форматируем числа для красивого вывода
+        formatted_row = [f"{x:8.3f}" if isinstance(x, float) else f"{x:8}" for x in row]
+        print(" ".join(formatted_row))
+    
+    print("─" * (len(matrix[0]) * 10))
+
 # print(f"Determinant = {det_matrix(input_matrix())}")
-print(f"Determinant = {matrix_subtraction(input_square_matrix(), input_square_matrix())}")
+print(f"Determinant = {print_matrix(matrix_subtraction(input_square_matrix(), input_square_matrix()))}")
