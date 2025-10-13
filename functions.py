@@ -8,7 +8,7 @@
 # Умножение на число - in process❌
 # Создание единичной матрицы любого порядка - in process❌
 # Создание нуль матрицы - in process❌
-# Красивый вывод - complete (FIXME) ✅❌
+# Красивый вывод - complete (FIXME: найти, что выводит None в конце) ✅❌
 
 
 def input_square_matrix():
