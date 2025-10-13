@@ -48,7 +48,7 @@ def det_matrix(matrix: list) -> float:
     n = len(matrix)
     for row in matrix:
         if len(row) != n:
-            raise ValueError("Матрица должна быть квадратной")
+            raise ValueError("Детерминант бывает только у квадратной матрицы😢")
     
     # Базовые случаи для матриц малого порядка
     if n == 1:
@@ -66,9 +66,8 @@ def det_matrix(matrix: list) -> float:
                 matrix[0][1] * matrix[1][0] * matrix[2][2] -
                 matrix[0][0] * matrix[1][2] * matrix[2][1])
     
-    # Рекурсивное вычисление для матриц большего порядка
+    # Вычисление для матриц большего порядка
     determinant = 0
-    
     # Разложение по первой строке
     for j in range(n):
         # Создаем минор - матрица без первой строки и j-го столбца
@@ -106,16 +105,9 @@ def algebraic_complement_matrix_compact(matrix):
     """Нахождение союзной матрицы(понадобится для нахождения обратной)
     Аргументы: matrix - матрица, для которой будет найдена союзная
     Возвращает: союзную матрицу
-    
-    
-    WARNING: Нужно согласовать функцию с det_matrix
-    !!!ПЕРЕПИСАТЬ!!!
-    
-    
     """
+    
     n = len(matrix)
-
-    # Проверка квадратности
     if any(len(row) != n for row in matrix):
         raise ValueError("Матрица должна быть квадратной")
     
@@ -123,17 +115,9 @@ def algebraic_complement_matrix_compact(matrix):
         """Определитель минора"""
         minor = [row[:excl_col] + row[excl_col+1:] 
                 for i, row in enumerate(mat) if i != excl_row]
-        return det(minor)
+        return det_matrix(minor)
     
-    def det(mat):
-        """Определитель матрицы"""
-        size = len(mat)
-        if size == 1: return mat[0][0]
-        if size == 2: return mat[0][0]*mat[1][1] - mat[0][1]*mat[1][0]
-        return sum((1 if j%2==0 else -1) * mat[0][j] * 
-                    det([row[:j] + row[j+1:] for row in mat[1:]]) 
-                    for j in range(size))
-    
+    print("Алгебраическое дополнение введенной матрицы:", end='')
     return [[(1 if (i+j)%2==0 else -1) * minor_det(matrix, i, j) 
             for j in range(n)] for i in range(n)]
 
@@ -161,4 +145,6 @@ def print_matrix(matrix, title="Матрица"):
 # Некоторые тесты:
 
 # print(f"Determinant = {det_matrix(input_matrix())}")
-print(f"Determinant = {print_matrix(matrix_subtraction(input_square_matrix(), input_square_matrix()))}")
+# print(f"Determinant = {print_matrix(matrix_subtraction(input_square_matrix(), input_square_matrix()))}")
+# print(print_matrix(algebraic_complement_matrix_compact(input_square_matrix())))
+print(print_matrix(input_matrix_simple()))
