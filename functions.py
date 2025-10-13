@@ -1,3 +1,16 @@
+#TODO: 
+# Ввод матриц - complete✅
+# Детерминант - complete✅
+# Вычитание - complete✅
+# Сложение - in process❌
+# Союзная матрица - complete✅
+# Обратная матрица - in process❌
+# Умножение на число - in process❌
+# Создание единичной матрицы любого порядка - in process❌
+# Создание нуль матрицы - in process❌
+# Красивый вывод - complete (FIXME) ✅❌
+
+
 def input_square_matrix():
     """"Ввод матрицы n-го порядка"""    
     n = int(input("Введите порядок матрицы: "))
@@ -147,4 +160,4 @@ def print_matrix(matrix, title="Матрица"):
 # print(f"Determinant = {det_matrix(input_matrix())}")
 # print(f"Determinant = {print_matrix(matrix_subtraction(input_square_matrix(), input_square_matrix()))}")
 # print(print_matrix(algebraic_complement_matrix_compact(input_square_matrix())))
-print(print_matrix(input_matrix_simple()))
+# print(print_matrix(input_matrix_simple()))
