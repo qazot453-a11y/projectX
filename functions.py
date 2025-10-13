@@ -5,51 +5,119 @@
 # Сложение - in process❌
 # Союзная матрица - complete✅
 # Обратная матрица - in process❌
-# Умножение на число - in process❌
+# Умножение на число - complete✅
 # Создание единичной матрицы любого порядка - in process❌
 # Создание нуль матрицы - in process❌
-# Красивый вывод - complete (FIXME: найти, что выводит None в конце) ✅❌
+# Красивый вывод - complete✅
 
 
-def input_square_matrix():
-    """"Ввод матрицы n-го порядка"""    
-    n = int(input("Введите порядок матрицы: "))
+def input_matrix_square() -> list[list[float]]:
+    """Ввод матрицы n-го порядка с проверкой ввода"""    
+    # Проверка ввода порядка матрицы
+    while True:
+        try:
+            n = int(input("Введите порядок матрицы: "))
+            if n <= 0:
+                print("Порядок матрицы должен быть положительным числом!")
+                continue
+            break
+        except ValueError:
+            print("Ошибка: введите целое число для порядка матрицы!")
     
     print(f"Введите элементы матрицы {n}x{n} построчно:")
     matrix = []
     
     for i in range(n):
-        row = list(map(float, input(f"Строка {i+1}: ").split()))
-        if len(row) != n:
-            raise ValueError(f"Ожидается {n} элементов в строке, получено {len(row)}")
-        matrix.append(row)
+        while True:
+            try:
+                input_line = input(f"Строка {i+1}: ").strip()
+                if not input_line:
+                    print("Строка не может быть пустой!")
+                    continue
+                    
+                elements = input_line.split()
+                if len(elements) != n:
+                    print(f"Ошибка: ожидается {n} элементов в строке, получено {len(elements)}")
+                    continue
+                
+                # Пробуем преобразовать все элементы в числа
+                row = []
+                for j, element in enumerate(elements):
+                    try:
+                        num = float(element)
+                        row.append(num)
+                    except ValueError:
+                        print(f"Ошибка: элемент '{element}' в позиции {j+1} не является числом!")
+                        raise ValueError
+                
+                matrix.append(row)
+                break
+                
+            except ValueError:
+                print("Пожалуйста, введите только числа, разделенные пробелами!")
+            except KeyboardInterrupt:
+                print("\nВвод прерван пользователем")
+                return None
+            except Exception as e:
+                print(f"Произошла ошибка: {e}")
     
     return matrix
 
 
-def input_matrix_simple():
-    """Ввод прямоугольной матрицы"""
-    rows = int(input("Строки: "))
-    cols = int(input("Столбцы: "))
+def input_matrix_rectangular() -> list[list[float]]:
+    """Компактная версия ввода прямоугольной матрицы"""
+    # Ввод размеров с проверкой
+    def get_positive_integer(prompt):
+        while True:
+            try:
+                value = int(input(prompt))
+                if value > 0:
+                    return value
+                print("Число должно быть положительным!")
+            except ValueError:
+                print("Введите целое число!")
     
-    print(f"Введите {rows} строк по {cols} чисел:")
+    rows = get_positive_integer("Введите количество строк: ")
+    cols = get_positive_integer("Введите количество столбцов: ")
+    
+    print(f"\nВведите {rows} строк по {cols} чисел:")
     matrix = []
     
     for i in range(rows):
         while True:
             try:
-                row = list(map(float, input().split()))
-                if len(row) == cols:
-                    matrix.append(row)
-                    break
-                print(f"Нужно {cols} чисел, получено {len(row)}")
+                input_line = input(f"Строка {i+1}: ").strip()
+                if not input_line:
+                    print("Строка не может быть пустой!")
+                    continue
+                    
+                elements = input_line.split()
+                if len(elements) != cols:
+                    print(f"Нужно {cols} чисел, получено {len(elements)}")
+                    continue
+                
+                # Проверяем, что все элементы - числа
+                row = []
+                for element in elements:
+                    try:
+                        row.append(float(element))
+                    except ValueError:
+                        print(f"Элемент '{element}' не является числом!")
+                        raise ValueError
+                
+                matrix.append(row)
+                break
+                
             except ValueError:
-                print("Только числа!")
+                print("Пожалуйста, вводите только числа!")
+            except KeyboardInterrupt:
+                print("\nВвод прерван")
+                return None
     
     return matrix
 
 
-def det_matrix(matrix: list) -> float:
+def matrix_det(matrix: list[list[float]]) -> float:
     """
     Вычисляет детерминант матрицы любого порядка
     
@@ -93,7 +161,7 @@ def det_matrix(matrix: list) -> float:
             minor.append(row)
         
         # Рекурсивно вычисляем определитель минора
-        minor_det = det_matrix(minor)
+        minor_det = matrix_det(minor)
         
         # Добавляем к общей сумме с учетом знака
         sign = 1 if j % 2 == 0 else -1
@@ -102,7 +170,7 @@ def det_matrix(matrix: list) -> float:
     return determinant
 
 
-def matrix_subtraction(matrix1, matrix2):
+def matrix_subtraction(matrix1: list[list[float]], matrix2: list[list[float]]) -> list[list[float]]:
     """Вычитание матриц
     Аргументы: matrix1, matrix2 - матрицы(первая минус вторая)
     Возвращает: матрицу-результат вычитания
@@ -114,7 +182,36 @@ def matrix_subtraction(matrix1, matrix2):
             for i in range(len(matrix1))]
 
 
-def algebraic_complement_matrix_compact(matrix):
+def matrix_multiply_by_scalar(matrix:list[list[float]]) -> list[list[float]]:
+    """
+    Принимает матрицу, запрашивает число и возвращает матрицу, умноженную на это число
+    
+    Args:
+        matrix: исходная матрица
+    
+    Returns:
+        result: результирующая матрица
+    """
+    while True:
+        try:
+            scalar_input = input("Введите число для умножения матрицы: ").strip()
+            if not scalar_input:
+                print("Число не может быть пустым!")
+                continue
+                
+            scalar = float(scalar_input)
+            break
+        except TypeError:
+            print("Ошибка: введите корректное число!")
+            
+    result = []
+    for row in matrix:
+        new_row = [element * scalar for element in row]
+        result.append(new_row)
+    
+    return result
+
+def matrix_algebraic_complement(matrix: list[list[float]]) -> list[list[float]]:
     """Нахождение союзной матрицы(понадобится для нахождения обратной)
     Аргументы: matrix - матрица, для которой будет найдена союзная
     Возвращает: союзную матрицу
@@ -128,14 +225,14 @@ def algebraic_complement_matrix_compact(matrix):
         """Определитель минора"""
         minor = [row[:excl_col] + row[excl_col+1:] 
                 for i, row in enumerate(mat) if i != excl_row]
-        return det_matrix(minor)
+        return matrix_det(minor)
     
     print("Алгебраическое дополнение введенной матрицы:", end='')
     return [[(1 if (i+j)%2==0 else -1) * minor_det(matrix, i, j) 
             for j in range(n)] for i in range(n)]
 
 
-def print_matrix(matrix, title="Матрица"):
+def print_matrix(matrix:list[list[float]], title="Матрица") -> None:
     """
     Красивый вывод матрицы
     
@@ -157,7 +254,8 @@ def print_matrix(matrix, title="Матрица"):
 
 # Некоторые тесты:
 
-# print(f"Determinant = {det_matrix(input_matrix())}")
-# print(f"Determinant = {print_matrix(matrix_subtraction(input_square_matrix(), input_square_matrix()))}")
-# print(print_matrix(algebraic_complement_matrix_compact(input_square_matrix())))
-# print(print_matrix(input_matrix_simple()))
+# print(f"Determinant = {matrix_det(input_matrix())}")
+# print(f"Determinant = {print_matrix(matrix_subtraction(input_matrix_square(), input_matrix_square()))}")
+# print(print_matrix(algebraic_complement_matrix_compact(input_matrix_square())))
+# print(print_matrix(input_matrix_rectangular()))
+# print_matrix(matrix_multiply_by_scalar(input_matrix_rectangular()))
