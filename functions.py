@@ -2,13 +2,17 @@
 # Ввод матриц - complete✅
 # Детерминант - complete✅
 # Вычитание - complete✅
-# Сложение - in process❌
+# Сложение - complete✅
+# Проверка на вырожденность - complete✅
+# Транспонирование - complete✅
 # Союзная матрица - complete✅
-# Обратная матрица - in process❌
+# Обратная матрица - complete✅
 # Умножение на число - complete✅
-# Создание единичной матрицы любого порядка - in process❌
-# Создание нуль матрицы - in process❌
+# Создание единичной матрицы любого порядка - complete✅
+# Создание нуль матрицы - complete✅
 # Красивый вывод - complete✅
+
+#FIXME Убрать все raise и заменить except'ами
 
 
 def input_matrix_square() -> list[list[float]]:
@@ -233,6 +237,44 @@ def matrix_add(matrix1: list[list[float]], matrix2: list[list[float]]) -> list[l
             for i in range(len(matrix1))]
 
 
+def matrix_is_singular(matrix):
+    """
+    Проверяет, является ли матрица вырожденной
+    
+    Args:
+        matrix: квадратная матрица (list[list[float]])
+    
+    Returns:
+        bool: True если матрица вырожденная (определитель = 0), False иначе
+    
+    Raises:
+        ValueError: если матрица не квадратная или пустая
+    """
+    # Проверка на квадратность
+    n = len(matrix)
+    for row in matrix:
+        if len(row) != n:
+            raise ValueError("Матрица должна быть квадратной")
+    
+    # Вычисляем определитель
+    det = matrix_det(matrix)
+    
+    # Матрица вырожденная, если определитель равен 0 (с учетом погрешности вычислений)
+    return abs(det) < 1e-12
+
+
+def matrix_transpose(matrix):
+    """
+    Транспонирует матрицу
+    
+    Args:
+        matrix: матрица для транспонирования
+    
+    Returns:
+        list: транспонированная матрица
+    """
+    return [[matrix[i][j] for i in range(len(matrix))] for j in range(len(matrix[0]))]
+
 def matrix_algebraic_complement(matrix: list[list[float]]) -> list[list[float]]:
     """Нахождение союзной матрицы(понадобится для нахождения обратной)
     Аргументы: matrix - матрица, для которой будет найдена союзная
@@ -249,8 +291,99 @@ def matrix_algebraic_complement(matrix: list[list[float]]) -> list[list[float]]:
         return matrix_det(minor)
     
     print("Алгебраическое дополнение введенной матрицы:", end='')
-    return [[(1 if (i+j)%2==0 else -1) * minor_det(matrix, i, j) 
-            for j in range(n)] for i in range(n)]
+    return matrix_transpose([[(1 if (i+j)%2==0 else -1) * minor_det(matrix, i, j) 
+            for j in range(n)] for i in range(n)])
+
+
+def matrix_inverse(matrix: list[list[float]]) -> list[list[float]]:
+    """
+    Находит матрицу, обратную данной
+    
+    Args:
+        matrix: матрица, которой будем искать обратную
+    
+    Returns:
+        list: обратная матрица
+        
+    Raises:
+        ValueError: матрица не квадратная/пустая
+        ValueError: Матрица вырожденная
+        
+    """
+    if not matrix or len(matrix) != len(matrix[0]):
+        raise ValueError("Матрица должна быть квадратной и не пустой")
+    
+    det = matrix_det(matrix)
+    if matrix_is_singular(matrix):
+        raise ValueError("Матрица вырожденная")
+    
+    # Получаем союзную матрицу и транспонируем ее
+    adjugate = matrix_algebraic_complement(matrix)
+    
+    # Делим на определитель
+    n = len(matrix)
+    return [[adjugate[i][j] / det for j in range(n)] for i in range(n)]
+
+
+def unit_matrix() -> list[list[float]]:
+    """
+    Создает единичную матрицу порядка n
+    
+    Args:
+        n: порядок матрицы (количество строк и столбцов)
+    
+    Returns:
+        list: единичная матрица n x n
+    """
+    while True:
+        try:
+            n = int(input("Введите порядок матрицы: "))
+            if n <= 0:
+                print("Порядок матрицы должен быть положительным числом!")
+                continue
+            break
+        except ValueError:
+            print("Ошибка: введите целое число для порядка матрицы!")
+            
+    return [[1 if i == j else 0 for j in range(n)] for i in range(n)]
+    
+
+
+def zero_matrix() -> list[list[float]]:
+    # Запрос количества строк
+    while True:
+        try:
+            rows_input = input("Введите количество строк: ").strip()
+            if not rows_input:
+                print("Количество строк не может быть пустым!")
+                continue
+                
+            rows = int(rows_input)
+            if rows <= 0:
+                print("Количество строк должно быть положительным числом!")
+                continue
+            break
+        except ValueError:
+            print("Ошибка: введите целое число для количества строк!")
+    
+    # Запрос количества столбцов
+    while True:
+        try:
+            cols_input = input("Введите количество столбцов: ").strip()
+            if not cols_input:
+                print("Количество столбцов не может быть пустым!")
+                continue
+                
+            cols = int(cols_input)
+            if cols <= 0:
+                print("Количество столбцов должно быть положительным числом!")
+                continue
+            break
+        except ValueError:
+            print("Ошибка: введите целое число для количества столбцов!")
+    
+    zero_matrix = [[0 for _ in range(cols)] for _ in range(rows)]
+    return zero_matrix
 
 
 def print_matrix(matrix:list[list[float]]) -> None:
@@ -282,3 +415,6 @@ def print_matrix(matrix:list[list[float]]) -> None:
 # print_matrix(matrix_multiply_by_scalar(input_matrix_rectangular()))
 # print_matrix(matrix_add(input_matrix_rectangular(), input_matrix_rectangular()))
 # print(matrix_det(input_matrix_square()))
+# print_matrix(zero_matrix())
+# print_matrix(unit_matrix())
+# print_matrix(matrix_inverse(input_matrix_square()))
