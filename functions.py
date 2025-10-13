@@ -60,7 +60,7 @@ def input_matrix_square() -> list[list[float]]:
                 return None
             except Exception as e:
                 print(f"Произошла ошибка: {e}")
-    
+        
     return matrix
 
 
@@ -170,18 +170,6 @@ def matrix_det(matrix: list[list[float]]) -> float:
     return determinant
 
 
-def matrix_subtraction(matrix1: list[list[float]], matrix2: list[list[float]]) -> list[list[float]]:
-    """Вычитание матриц
-    Аргументы: matrix1, matrix2 - матрицы(первая минус вторая)
-    Возвращает: матрицу-результат вычитания
-    """
-    if len(matrix1) != len(matrix2) or len(matrix1[0]) != len(matrix2[0]):
-        raise ValueError("Размерности матриц не совпадают")
-    
-    return [[matrix1[i][j] - matrix2[i][j] for j in range(len(matrix1[0]))] 
-            for i in range(len(matrix1))]
-
-
 def matrix_multiply_by_scalar(matrix:list[list[float]]) -> list[list[float]]:
     """
     Принимает матрицу, запрашивает число и возвращает матрицу, умноженную на это число
@@ -208,15 +196,48 @@ def matrix_multiply_by_scalar(matrix:list[list[float]]) -> list[list[float]]:
     for row in matrix:
         new_row = [element * scalar for element in row]
         result.append(new_row)
-    
+    print(f'Результат умножения матрицы на {scalar}', end='')
     return result
+
+
+def matrix_subtraction(matrix1: list[list[float]], matrix2: list[list[float]]) -> list[list[float]]:
+    """Вычитание матриц
+    Аргументы: matrix1, matrix2 - матрицы(первая минус вторая)
+    Возвращает: матрицу-результат вычитания
+    """
+    if len(matrix1) != len(matrix2) or len(matrix1[0]) != len(matrix2[0]):
+        raise ValueError("Размерности матриц не совпадают")
+    print('Результат вычитания матриц:', end='')
+    return [[matrix1[i][j] - matrix2[i][j] for j in range(len(matrix1[0]))] 
+            for i in range(len(matrix1))]
+
+
+def matrix_add(matrix1: list[list[float]], matrix2: list[list[float]]) -> list[list[float]]:
+    """
+    Складывает две матрицы: matrix1 + matrix2
+    
+    Args:
+        matrix1: первая матрица
+        matrix2: вторая матрица
+    
+    Returns:
+        matrix1 + matrix2: результирующая матрица
+    
+    Raises:
+        ValueError: если размерности матриц не совпадают
+    """
+    if len(matrix1) != len(matrix2) or len(matrix1[0]) != len(matrix2[0]):
+        raise ValueError("Размерности матриц не совпадают")
+    print('Результат сложения матриц:', end='')
+    return [[matrix1[i][j] + matrix2[i][j] for j in range(len(matrix1[0]))] 
+            for i in range(len(matrix1))]
+
 
 def matrix_algebraic_complement(matrix: list[list[float]]) -> list[list[float]]:
     """Нахождение союзной матрицы(понадобится для нахождения обратной)
     Аргументы: matrix - матрица, для которой будет найдена союзная
     Возвращает: союзную матрицу
     """
-    
     n = len(matrix)
     if any(len(row) != n for row in matrix):
         raise ValueError("Матрица должна быть квадратной")
@@ -232,17 +253,17 @@ def matrix_algebraic_complement(matrix: list[list[float]]) -> list[list[float]]:
             for j in range(n)] for i in range(n)]
 
 
-def print_matrix(matrix:list[list[float]], title="Матрица") -> None:
+def print_matrix(matrix:list[list[float]]) -> None:
     """
     Красивый вывод матрицы
     
-    Аргументы: matrix: матрица для вывода, title: заголовок
+    Аргументы: matrix: матрица для вывода
     """
     if not matrix:
         print("Матрица пуста")
         return
     
-    print(f"\n{title} {len(matrix)}x{len(matrix[0])}:")
+    print(f"\nМатрица {len(matrix)}x{len(matrix[0])}:")
     print("─" * (len(matrix[0]) * 10))
     
     for row in matrix:
@@ -259,3 +280,5 @@ def print_matrix(matrix:list[list[float]], title="Матрица") -> None:
 # print(print_matrix(algebraic_complement_matrix_compact(input_matrix_square())))
 # print(print_matrix(input_matrix_rectangular()))
 # print_matrix(matrix_multiply_by_scalar(input_matrix_rectangular()))
+# print_matrix(matrix_add(input_matrix_rectangular(), input_matrix_rectangular()))
+# print(matrix_det(input_matrix_square()))
