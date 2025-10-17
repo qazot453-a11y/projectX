@@ -11,10 +11,26 @@ def get_main_keyboard(has_matrices=False):
     if has_matrices:
         keyboard.keyboard.extend([
             [KeyboardButton(text="📊 Вывести матрицу")],
-            [KeyboardButton(text="🧮 Вычислить детерминант")]
+            [KeyboardButton(text="🧮 Операции с матрицами")]
         ])
     
     return keyboard
+
+def get_operations_keyboard():
+    """Клавиатура с операциями над матрицами"""
+    keyboard_lines = [
+        [InlineKeyboardButton(text="🔢 Детерминант", callback_data="op_det")],
+        [InlineKeyboardButton(text="✖️ Умножить на скаляр", callback_data="op_scalar")],
+        [InlineKeyboardButton(text="➕ Сложение", callback_data="op_add")],
+        [InlineKeyboardButton(text="➖ Вычитание", callback_data="op_sub")],
+        [InlineKeyboardButton(text="🔄 Транспонирование", callback_data="op_transpose")],
+        [InlineKeyboardButton(text="🔄 Обратная матрица", callback_data="op_inverse")],
+        [InlineKeyboardButton(text="📐 Алгебраическое дополнение", callback_data="op_complement")],
+        [InlineKeyboardButton(text="❓ Проверка на сингулярность", callback_data="op_singular")],
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="op_back")]
+    ]
+    
+    return InlineKeyboardMarkup(inline_keyboard=keyboard_lines)
 
 def get_size_keyboard():
     # Создаем список строк для клавиатуры 5x5
@@ -38,19 +54,40 @@ def get_size_keyboard():
     
     return InlineKeyboardMarkup(inline_keyboard=keyboard_lines)
 
-def get_matrices_list_keyboard(matrices_dict, action="show"):
+def get_matrices_list_keyboard(matrices_dict, action="show", selected_matrix=None):
     """
-    action: "show" для показа матрицы, "det" для вычисления детерминанта
+    action: тип операции
+    selected_matrix: уже выбранная матрица (для операций с двумя матрицами)
     """
     # Создаем кнопки для каждой матрицы
     buttons = []
     for name in matrices_dict.keys():
+        if selected_matrix == name:
+            # Помечаем уже выбранную матрицу
+            text = f"✅ {name}"
+        else:
+            text = name
         buttons.append([InlineKeyboardButton(
-            text=name, 
+            text=text, 
             callback_data=f"{action}_{name}"
         )])
     
+    # Добавляем кнопку отмены
+    buttons.append([InlineKeyboardButton(
+        text="🔙 Отмена", 
+        callback_data="operation_cancel"
+    )])
+    
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_save_matrix_keyboard():
+    """Клавиатура для сохранения результата операции"""
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="💾 Сохранить результат", 
+            callback_data="save_result"
+        )
+    ]])
 
 def get_delete_matrices_keyboard(matrices_dict):
     """Клавиатура для удаления матриц"""

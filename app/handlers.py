@@ -1,23 +1,37 @@
 from aiogram import Router, F
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
-from app.keyboards import get_main_keyboard, get_size_keyboard, get_matrices_list_keyboard, get_delete_matrices_keyboard
+from app.keyboards import (
+    get_main_keyboard, get_size_keyboard, get_matrices_list_keyboard, 
+    get_delete_matrices_keyboard, get_operations_keyboard, get_save_matrix_keyboard
+)
 from app.convert import convert_to_2d
-from functions import matrix_det
+from functions import (
+    matrix_det, matrix_multiply_by_scalar, matrix_subtraction, matrix_add,
+    matrix_is_singular, matrix_transpose, matrix_algebraic_complement, matrix_inverse
+)
+import re
 
 router = Router()
 
 # Глобальный словарь для хранения матриц всех пользователей
-# Структура: {user_id: {matrix_name: matrix_data}}
 user_databases = {}
+
+# Временное хранилище для операций с двумя матрицами
+operation_storage = {}
 
 class MatrixStates(StatesGroup):
     waiting_for_name = State()
     waiting_for_size = State()
     waiting_for_rows = State()
-    waiting_for_manual_size = State()  # Новое состояние для ручного ввода размера
+    waiting_for_manual_size = State()
+    waiting_for_operation = State()
+    waiting_for_scalar = State()
+    waiting_for_first_matrix = State()
+    waiting_for_second_matrix = State()
+    waiting_for_save_name = State()
 
 def get_user_matrices(user_id):
     """Получает словарь матриц пользователя, создает если нет"""
@@ -38,6 +52,32 @@ def save_user_matrix(user_id, matrix_name, matrix_data):
     user_matrices[matrix_name] = matrix_data
     return user_matrices
 
+def format_matrix_output(matrix_2d, name="Результат"):
+    """Форматирует матрицу для вывода"""
+    matrix_str = f"Матрица '{name}':\n"
+    for row in matrix_2d:
+        matrix_str += "│ " + " ".join(f"{x:8.2f}" for x in row) + " │\n"
+    return matrix_str
+
+def convert_to_storage_format(matrix_2d):
+    """Конвертирует двумерную матрицу в формат хранения"""
+    storage_data = []
+    for row in matrix_2d:
+        storage_data.extend(row)
+        storage_data.append(';')
+    return storage_data
+
+def sanitize_matrix_name(name):
+    """Очищает имя матрицы от недопустимых символов"""
+    # Заменяем пробелы и специальные символы на подчеркивания
+    sanitized = re.sub(r'[^\w]', '_', name)
+    # Убираем множественные подчеркивания
+    sanitized = re.sub(r'_+', '_', sanitized)
+    # Убираем подчеркивания в начале и конце
+    sanitized = sanitized.strip('_')
+    return sanitized
+
+# Обработчик команды /start
 @router.message(Command("start"))
 async def start_command(message: Message):
     user_id = message.from_user.id
@@ -47,10 +87,9 @@ async def start_command(message: Message):
         f"🤖 Добро пожаловать в калькулятор матриц, {message.from_user.first_name}!\n\n"
         "Возможности бота:\n"
         "• Создание и хранение матриц\n"
-        "• Вычисление детерминанта\n"
+        "• Все основные операции с матрицами\n"
         "• Визуализация матриц\n"
         "• Удаление матриц\n\n"
-        f"Ваш ID: {user_id}\n"
         f"Сохранено матриц: {len(user_matrices)}/10\n\n"
         "Доступные команды:\n"
         "/start - начать работу\n"
@@ -95,32 +134,6 @@ async def delete_matrix_command(message: Message):
         reply_markup=get_delete_matrices_keyboard(user_matrices)
     )
 
-@router.callback_query(F.data.startswith("delete_"))
-async def process_matrix_deletion(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    user_matrices = get_user_matrices(user_id)
-    
-    if callback.data == "delete_cancel":
-        await callback.message.answer("Удаление отменено.")
-        await callback.answer()
-        return
-    
-    matrix_name = callback.data.split('_')[1]
-    
-    if matrix_name not in user_matrices:
-        await callback.answer("Матрица не найдена!")
-        return
-    
-    # Удаляем матрицу
-    del user_matrices[matrix_name]
-    
-    await callback.message.answer(
-        f"✅ Матрица '{matrix_name}' успешно удалена!\n"
-        f"Осталось матриц: {len(user_matrices)}/10",
-        reply_markup=get_main_keyboard(has_matrices=len(user_matrices) > 0)
-    )
-    await callback.answer()
-
 @router.message(F.text == "➕ Добавить новую матрицу")
 async def process_add_matrix(message: Message, state: FSMContext):
     await state.set_state(MatrixStates.waiting_for_name)
@@ -143,8 +156,8 @@ async def process_show_matrix(message: Message):
         reply_markup=get_matrices_list_keyboard(user_matrices, "show")
     )
 
-@router.message(F.text == "🧮 Вычислить детерминант")
-async def process_determinant(message: Message):
+@router.message(F.text == "🧮 Операции с матрицами")
+async def show_operations(message: Message):
     user_id = message.from_user.id
     user_matrices = get_user_matrices(user_id)
     
@@ -153,9 +166,343 @@ async def process_determinant(message: Message):
         return
     
     await message.answer(
-        "Выберите матрицу для вычисления детерминанта:",
-        reply_markup=get_matrices_list_keyboard(user_matrices, "det")
+        "Выберите операцию:",
+        reply_markup=get_operations_keyboard()
     )
+
+# Обработчики операций
+@router.callback_query(F.data.startswith("op_"))
+async def process_operation_selection(callback: CallbackQuery, state: FSMContext):
+    operation = callback.data.replace("op_", "")
+    user_id = callback.from_user.id
+    
+    if operation == "back":
+        await callback.message.answer(
+            "Главное меню:",
+            reply_markup=get_main_keyboard(has_matrices=len(get_user_matrices(user_id)) > 0)
+        )
+        await callback.answer()
+        return
+    
+    await state.update_data(current_operation=operation)
+    
+    if operation in ["add", "sub"]:
+        # Операции с двумя матрицами
+        await state.set_state(MatrixStates.waiting_for_first_matrix)
+        await callback.message.answer(
+            f"Выбрана операция: {'Сложение' if operation == 'add' else 'Вычитание'}\n"
+            "Выберите первую матрицу:",
+            reply_markup=get_matrices_list_keyboard(get_user_matrices(user_id), "select_first")
+        )
+    elif operation == "scalar":
+        # Умножение на скаляр
+        await state.set_state(MatrixStates.waiting_for_first_matrix)
+        await callback.message.answer(
+            "Выбрана операция: Умножение на скаляр\n"
+            "Выберите матрицу:",
+            reply_markup=get_matrices_list_keyboard(get_user_matrices(user_id), "select_scalar")
+        )
+    else:
+        # Операции с одной матрицей
+        await state.set_state(MatrixStates.waiting_for_first_matrix)
+        operation_names = {
+            "det": "Детерминант",
+            "transpose": "Транспонирование",
+            "inverse": "Обратная матрица",
+            "complement": "Алгебраическое дополнение",
+            "singular": "Проверка на сингулярность"
+        }
+        await callback.message.answer(
+            f"Выбрана операция: {operation_names[operation]}\n"
+            "Выберите матрицу:",
+            reply_markup=get_matrices_list_keyboard(get_user_matrices(user_id), "select_single")
+        )
+    
+    await callback.answer()
+
+# Обработчики выбора матриц для операций
+@router.callback_query(F.data.startswith("select_first_"), MatrixStates.waiting_for_first_matrix)
+async def process_first_matrix_selection(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    matrix_name = callback.data.replace("select_first_", "")
+    user_matrices = get_user_matrices(user_id)
+    
+    if matrix_name not in user_matrices:
+        await callback.answer("Матрица не найдена!")
+        return
+    
+    # Сохраняем первую матрицу
+    operation_storage[user_id] = {
+        "first_matrix": matrix_name,
+        "first_matrix_data": user_matrices[matrix_name]
+    }
+    
+    await state.set_state(MatrixStates.waiting_for_second_matrix)
+    await callback.message.answer(
+        f"Выбрана матрица: {matrix_name}\n"
+        "Выберите вторую матрицу:",
+        reply_markup=get_matrices_list_keyboard(user_matrices, "select_second", matrix_name)
+    )
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("select_second_"), MatrixStates.waiting_for_second_matrix)
+async def process_second_matrix_selection(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    matrix_name = callback.data.replace("select_second_", "")
+    user_data = await state.get_data()
+    operation = user_data.get("current_operation")
+    user_matrices = get_user_matrices(user_id)
+    
+    if matrix_name not in user_matrices:
+        await callback.answer("Матрица не найдена!")
+        return
+    
+    # Получаем данные обеих матриц
+    first_matrix_name = operation_storage[user_id]["first_matrix"]
+    first_matrix_data = operation_storage[user_id]["first_matrix_data"]
+    second_matrix_data = user_matrices[matrix_name]
+    
+    # Выполняем операцию
+    try:
+        matrix1_2d = convert_to_2d(first_matrix_data)
+        matrix2_2d = convert_to_2d(second_matrix_data)
+        
+        if operation == "add":
+            result = matrix_add(matrix1_2d, matrix2_2d)
+            result_name = f"Сумма_{first_matrix_name}_{matrix_name}"
+        elif operation == "sub":
+            result = matrix_subtraction(matrix1_2d, matrix2_2d)
+            result_name = f"Разность_{first_matrix_name}_{matrix_name}"
+        
+        # Форматируем результат
+        result_str = format_matrix_output(result, result_name)
+        
+        # Сохраняем результат для возможного сохранения
+        operation_storage[user_id]["result"] = result
+        operation_storage[user_id]["result_name"] = result_name
+        
+        await callback.message.answer(
+            f"<pre>{result_str}</pre>",
+            parse_mode='HTML',
+            reply_markup=get_save_matrix_keyboard()
+        )
+        
+    except Exception as e:
+        await callback.message.answer(f"❌ Ошибка при выполнении операции: {str(e)}")
+    
+    await state.clear()
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("select_single_"), MatrixStates.waiting_for_first_matrix)
+async def process_single_matrix_selection(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    matrix_name = callback.data.replace("select_single_", "")
+    user_data = await state.get_data()
+    operation = user_data.get("current_operation")
+    user_matrices = get_user_matrices(user_id)
+    
+    if matrix_name not in user_matrices:
+        await callback.answer("Матрица не найдена!")
+        return
+    
+    matrix_data = user_matrices[matrix_name]
+    
+    try:
+        matrix_2d = convert_to_2d(matrix_data)
+        
+        if operation == "det":
+            if len(matrix_2d) != len(matrix_2d[0]):
+                await callback.message.answer("❌ Матрица должна быть квадратной для вычисления детерминанта!")
+                await state.clear()
+                return
+            
+            result = matrix_det(matrix_2d)
+            await callback.message.answer(
+                f"🔢 Детерминант матрицы '{matrix_name}':\n"
+                f"<b>det = {result:.6f}</b>",
+                parse_mode='HTML'
+            )
+            
+        elif operation == "transpose":
+            result = matrix_transpose(matrix_2d)
+            result_str = format_matrix_output(result, f"Транспонированная_{matrix_name}")
+            
+            # Сохраняем результат для возможного сохранения
+            operation_storage[user_id] = {
+                "result": result,
+                "result_name": f"Транспонированная_{matrix_name}"
+            }
+            
+            await callback.message.answer(
+                f"<pre>{result_str}</pre>",
+                parse_mode='HTML',
+                reply_markup=get_save_matrix_keyboard()
+            )
+            
+        elif operation == "inverse":
+            result = matrix_inverse(matrix_2d)
+            result_str = format_matrix_output(result, f"Обратная_{matrix_name}")
+            
+            operation_storage[user_id] = {
+                "result": result,
+                "result_name": f"Обратная_{matrix_name}"
+            }
+            
+            await callback.message.answer(
+                f"<pre>{result_str}</pre>",
+                parse_mode='HTML',
+                reply_markup=get_save_matrix_keyboard()
+            )
+            
+        elif operation == "complement":
+            result = matrix_algebraic_complement(matrix_2d)
+            result_str = format_matrix_output(result, f"Алгебраическое_дополнение_{matrix_name}")
+            
+            operation_storage[user_id] = {
+                "result": result,
+                "result_name": f"Алгебраическое_дополнение_{matrix_name}"
+            }
+            
+            await callback.message.answer(
+                f"<pre>{result_str}</pre>",
+                parse_mode='HTML',
+                reply_markup=get_save_matrix_keyboard()
+            )
+            
+        elif operation == "singular":
+            is_singular = matrix_is_singular(matrix_2d)
+            status = "сингулярна" if is_singular else "не сингулярна"
+            await callback.message.answer(
+                f"🔍 Матрица '{matrix_name}' {status}"
+            )
+        
+    except Exception as e:
+        await callback.message.answer(f"❌ Ошибка при выполнении операции: {str(e)}")
+    
+    await state.clear()
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("select_scalar_"), MatrixStates.waiting_for_first_matrix)
+async def process_scalar_matrix_selection(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+    matrix_name = callback.data.replace("select_scalar_", "")
+    user_matrices = get_user_matrices(user_id)
+    
+    if matrix_name not in user_matrices:
+        await callback.answer("Матрица не найдена!")
+        return
+    
+    # Сохраняем выбранную матрицу
+    operation_storage[user_id] = {
+        "matrix_name": matrix_name,
+        "matrix_data": user_matrices[matrix_name]
+    }
+    
+    await state.set_state(MatrixStates.waiting_for_scalar)
+    await callback.message.answer(
+        f"Выбрана матрица: {matrix_name}\n"
+        "Введите скаляр (число) для умножения:"
+    )
+    await callback.answer()
+
+@router.message(MatrixStates.waiting_for_scalar)
+async def process_scalar_input(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    
+    try:
+        scalar = float(message.text)
+        
+        matrix_name = operation_storage[user_id]["matrix_name"]
+        matrix_data = operation_storage[user_id]["matrix_data"]
+        
+        matrix_2d = convert_to_2d(matrix_data)
+        result = matrix_multiply_by_scalar(matrix_2d, scalar)
+        result_name = f"Умноженная_на_{scalar}_{matrix_name}"
+        
+        result_str = format_matrix_output(result, result_name)
+        
+        # Сохраняем результат для возможного сохранения
+        operation_storage[user_id]["result"] = result
+        operation_storage[user_id]["result_name"] = result_name
+        
+        await message.answer(
+            f"<pre>{result_str}</pre>",
+            parse_mode='HTML',
+            reply_markup=get_save_matrix_keyboard()
+        )
+        
+    except ValueError:
+        await message.answer("❌ Ошибка! Введите корректное число.")
+        return
+    
+    await state.clear()
+
+# Обработчик сохранения результата
+@router.callback_query(F.data == "save_result")
+async def process_save_request(callback: CallbackQuery, state: FSMContext):
+    """Обработчик запроса на сохранение результата"""
+    user_id = callback.from_user.id
+    
+    if user_id not in operation_storage or "result" not in operation_storage[user_id]:
+        await callback.answer("Результат не найден!")
+        return
+    
+    await state.set_state(MatrixStates.waiting_for_save_name)
+    await callback.message.answer(
+        "Введите название для сохранения результата:"
+    )
+    await callback.answer()
+
+@router.message(MatrixStates.waiting_for_save_name)
+async def process_save_name_input(message: Message, state: FSMContext):
+    """Обработчик ввода имени для сохранения результата"""
+    user_id = message.from_user.id
+    matrix_name = message.text.strip()
+    
+    if user_id not in operation_storage or "result" not in operation_storage[user_id]:
+        await message.answer("Результат не найден!")
+        await state.clear()
+        return
+    
+    # Проверяем, есть ли уже матрица с таким именем
+    user_matrices = get_user_matrices(user_id)
+    if matrix_name in user_matrices:
+        await message.answer(
+            f"Матрица с названием '{matrix_name}' уже существует. "
+            "Введите другое название:"
+        )
+        return
+    
+    # Сохраняем матрицу
+    result = operation_storage[user_id]["result"]
+    storage_data = convert_to_storage_format(result)
+    
+    save_user_matrix(user_id, matrix_name, storage_data)
+    user_matrices = get_user_matrices(user_id)
+    
+    await message.answer(
+        f"✅ Матрица '{matrix_name}' успешно сохранена!\n"
+        f"Всего матриц: {len(user_matrices)}/10",
+        reply_markup=get_main_keyboard(has_matrices=len(user_matrices) > 0)
+    )
+    
+    # Очищаем временное хранилище
+    if user_id in operation_storage:
+        del operation_storage[user_id]
+    
+    await state.clear()
+
+# Обработчик отмены операций
+@router.callback_query(F.data == "operation_cancel")
+async def process_operation_cancel(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.answer("Операция отменена.")
+    await callback.answer()
+
+@router.callback_query(F.data == "delete_cancel")
+async def process_delete_cancel(callback: CallbackQuery):
+    await callback.message.answer("Удаление отменено.")
+    await callback.answer()
 
 @router.message(MatrixStates.waiting_for_name)
 async def process_matrix_name(message: Message, state: FSMContext):
@@ -314,58 +661,33 @@ async def process_matrix_display(callback: CallbackQuery):
     matrix_2d = convert_to_2d(matrix_data)
     
     # Форматируем вывод
-    matrix_str = f"Матрица '{matrix_name}':\n"
-    for row in matrix_2d:
-        matrix_str += "│ " + " ".join(f"{x:8.2f}" for x in row) + " │\n"
+    matrix_str = format_matrix_output(matrix_2d, matrix_name)
     
     await callback.message.answer(f"<pre>{matrix_str}</pre>", parse_mode='HTML')
     await callback.answer()
 
-@router.callback_query(F.data.startswith("det_"))
-async def process_determinant_calculation(callback: CallbackQuery):
+@router.callback_query(F.data.startswith("delete_"))
+async def process_matrix_deletion(callback: CallbackQuery):
     user_id = callback.from_user.id
     user_matrices = get_user_matrices(user_id)
+    
+    if callback.data == "delete_cancel":
+        await callback.message.answer("Удаление отменено.")
+        await callback.answer()
+        return
+    
     matrix_name = callback.data.split('_')[1]
     
     if matrix_name not in user_matrices:
         await callback.answer("Матрица не найдена!")
         return
     
-    matrix_data = user_matrices[matrix_name]
+    # Удаляем матрицу
+    del user_matrices[matrix_name]
     
-    try:
-        # Преобразуем в двумерный вид
-        matrix_2d = convert_to_2d(matrix_data)
-        
-        # Проверяем, что матрица квадратная
-        if len(matrix_2d) != len(matrix_2d[0]):
-            await callback.message.answer(
-                f"❌ Матрица '{matrix_name}' не является квадратной! "
-                f"Размер: {len(matrix_2d)}x{len(matrix_2d[0])}\n"
-                f"Детерминант можно вычислить только для квадратных матриц."
-            )
-            await callback.answer()
-            return
-        
-        # Вычисляем детерминант
-        determinant = matrix_det(matrix_2d)
-        
-        # Форматируем вывод матрицы
-        matrix_str = f"Матрица '{matrix_name}':\n"
-        for row in matrix_2d:
-            matrix_str += "│ " + " ".join(f"{x:8.2f}" for x in row) + " │\n"
-        
-        # Отправляем результат
-        await callback.message.answer(
-            f"<pre>{matrix_str}</pre>\n"
-            f"🔢 Детерминант матрицы '{matrix_name}':\n"
-            f"<b>det = {determinant:.6f}</b>",
-            parse_mode='HTML'
-        )
-        
-    except Exception as e:
-        await callback.message.answer(
-            f"❌ Ошибка при вычислении детерминанта матрицы '{matrix_name}': {str(e)}"
-        )
-    
+    await callback.message.answer(
+        f"✅ Матрица '{matrix_name}' успешно удалена!\n"
+        f"Осталось матриц: {len(user_matrices)}/10",
+        reply_markup=get_main_keyboard(has_matrices=len(user_matrices) > 0)
+    )
     await callback.answer()
