@@ -9,7 +9,10 @@ def get_main_keyboard(has_matrices=False):
     )
     
     if has_matrices:
-        keyboard.keyboard.append([KeyboardButton(text="📊 Вывести матрицу")])
+        keyboard.keyboard.extend([
+            [KeyboardButton(text="📊 Вывести матрицу")],
+            [KeyboardButton(text="🧮 Вычислить детерминант")]
+        ])
     
     return keyboard
 
@@ -30,13 +33,16 @@ def get_size_keyboard():
     
     return InlineKeyboardMarkup(inline_keyboard=keyboard_lines)
 
-def get_matrices_list_keyboard(matrices_dict):
+def get_matrices_list_keyboard(matrices_dict, action="show"):
+    """
+    action: "show" для показа матрицы, "det" для вычисления детерминанта
+    """
     # Создаем кнопки для каждой матрицы
     buttons = []
     for name in matrices_dict.keys():
         buttons.append([InlineKeyboardButton(
             text=name, 
-            callback_data=f"show_{name}"
+            callback_data=f"{action}_{name}"
         )])
     
     return InlineKeyboardMarkup(inline_keyboard=buttons)

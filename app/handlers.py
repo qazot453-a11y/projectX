@@ -4,6 +4,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from app.keyboards import get_main_keyboard, get_size_keyboard, get_matrices_list_keyboard
+from app.convert import convert_to_2d
+# Импортируем из корневой папки
+from functions import matrix_det
 
 router = Router()
 
@@ -21,7 +24,7 @@ async def start_command(message: Message):
         "🤖 Добро пожаловать в калькулятор матриц!\n\n"
         "Возможности бота:\n"
         "• Создание и хранение матриц\n"
-        "• Операции с матрицами\n"
+        "• Вычисление детерминанта\n"
         "• Визуализация матриц\n\n"
         "Для начала работы нажмите кнопку ниже 👇",
         reply_markup=get_main_keyboard(has_matrices=len(user_matrices) > 0)
@@ -33,6 +36,28 @@ async def process_add_matrix(message: Message, state: FSMContext):
     await message.answer(
         "Введите название для новой матрицы:",
         reply_markup=ReplyKeyboardRemove()
+    )
+
+@router.message(F.text == "📊 Вывести матрицу")
+async def process_show_matrix(message: Message):
+    if not user_matrices:
+        await message.answer("Нет сохраненных матриц.")
+        return
+    
+    await message.answer(
+        "Выберите матрицу для отображения:",
+        reply_markup=get_matrices_list_keyboard(user_matrices, "show")
+    )
+
+@router.message(F.text == "🧮 Вычислить детерминант")
+async def process_determinant(message: Message):
+    if not user_matrices:
+        await message.answer("Нет сохраненных матриц.")
+        return
+    
+    await message.answer(
+        "Выберите матрицу для вычисления детерминанта:",
+        reply_markup=get_matrices_list_keyboard(user_matrices, "det")
     )
 
 @router.message(MatrixStates.waiting_for_name)
@@ -118,17 +143,6 @@ async def process_row_input(message: Message, state: FSMContext):
     except ValueError:
         await message.answer("Ошибка! Введите числа через пробел:")
 
-@router.message(F.text == "📊 Вывести матрицу")
-async def process_show_matrix(message: Message):
-    if not user_matrices:
-        await message.answer("Нет сохраненных матриц.")
-        return
-    
-    await message.answer(
-        "Выберите матрицу для отображения:",
-        reply_markup=get_matrices_list_keyboard(user_matrices)
-    )
-
 @router.callback_query(F.data.startswith("show_"))
 async def process_matrix_display(callback: CallbackQuery):
     matrix_name = callback.data.split('_')[1]
@@ -139,16 +153,8 @@ async def process_matrix_display(callback: CallbackQuery):
     
     matrix_data = user_matrices[matrix_name]
     
-    # Восстанавливаем двумерный вид
-    matrix_2d = []
-    current_row = []
-    
-    for item in matrix_data:
-        if item == ';':
-            matrix_2d.append(current_row)
-            current_row = []
-        else:
-            current_row.append(item)
+    # Преобразуем в двумерный вид
+    matrix_2d = convert_to_2d(matrix_data)
     
     # Форматируем вывод
     matrix_str = f"Матрица '{matrix_name}':\n"
@@ -156,4 +162,51 @@ async def process_matrix_display(callback: CallbackQuery):
         matrix_str += "│ " + " ".join(f"{x:8.2f}" for x in row) + " │\n"
     
     await callback.message.answer(f"<pre>{matrix_str}</pre>", parse_mode='HTML')
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("det_"))
+async def process_determinant_calculation(callback: CallbackQuery):
+    matrix_name = callback.data.split('_')[1]
+    
+    if matrix_name not in user_matrices:
+        await callback.answer("Матрица не найдена!")
+        return
+    
+    matrix_data = user_matrices[matrix_name]
+    
+    try:
+        # Преобразуем в двумерный вид
+        matrix_2d = convert_to_2d(matrix_data)
+        
+        # Проверяем, что матрица квадратная
+        if len(matrix_2d) != len(matrix_2d[0]):
+            await callback.message.answer(
+                f"❌ Матрица '{matrix_name}' не является квадратной! "
+                f"Размер: {len(matrix_2d)}x{len(matrix_2d[0])}\n"
+                f"Детерминант можно вычислить только для квадратных матриц."
+            )
+            await callback.answer()
+            return
+        
+        # Вычисляем детерминант
+        determinant = matrix_det(matrix_2d)
+        
+        # Форматируем вывод матрицы
+        matrix_str = f"Матрица '{matrix_name}':\n"
+        for row in matrix_2d:
+            matrix_str += "│ " + " ".join(f"{x:8.2f}" for x in row) + " │\n"
+        
+        # Отправляем результат
+        await callback.message.answer(
+            f"<pre>{matrix_str}</pre>\n"
+            f"🔢 Детерминант матрицы '{matrix_name}':\n"
+            f"<b>det = {determinant:.6f}</b>",
+            parse_mode='HTML'
+        )
+        
+    except Exception as e:
+        await callback.message.answer(
+            f"❌ Ошибка при вычислении детерминанта матрицы '{matrix_name}': {str(e)}"
+        )
+    
     await callback.answer()
