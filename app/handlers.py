@@ -5,27 +5,51 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from app.keyboards import get_main_keyboard, get_size_keyboard, get_matrices_list_keyboard
 from app.convert import convert_to_2d
-# Импортируем из корневой папки
 from functions import matrix_det
 
 router = Router()
 
-# Глобальный словарь для хранения матриц
-user_matrices = {}
+# Глобальный словарь для хранения матриц всех пользователей
+# Структура: {user_id: {matrix_name: matrix_data}}
+user_databases = {}
 
 class MatrixStates(StatesGroup):
     waiting_for_name = State()
     waiting_for_size = State()
     waiting_for_rows = State()
 
+def get_user_matrices(user_id):
+    """Получает словарь матриц пользователя, создает если нет"""
+    if user_id not in user_databases:
+        user_databases[user_id] = {}
+    return user_databases[user_id]
+
+def save_user_matrix(user_id, matrix_name, matrix_data):
+    """Сохраняет матрицу пользователя с ограничением в 10 матриц"""
+    user_matrices = get_user_matrices(user_id)
+    
+    # Ограничение на 10 матриц
+    if len(user_matrices) >= 10:
+        # Удаляем самую старую матрицу
+        oldest_key = next(iter(user_matrices))
+        del user_matrices[oldest_key]
+    
+    user_matrices[matrix_name] = matrix_data
+    return user_matrices
+
 @router.message(Command("start"))
 async def start_command(message: Message):
+    user_id = message.from_user.id
+    user_matrices = get_user_matrices(user_id)
+    
     await message.answer(
-        "🤖 Добро пожаловать в калькулятор матриц!\n\n"
+        f"🤖 Добро пожаловать в калькулятор матриц, {message.from_user.first_name}!\n\n"
         "Возможности бота:\n"
         "• Создание и хранение матриц\n"
         "• Вычисление детерминанта\n"
         "• Визуализация матриц\n\n"
+        f"Ваш ID: {user_id}\n"
+        f"Сохранено матриц: {len(user_matrices)}/10\n\n"
         "Для начала работы нажмите кнопку ниже 👇",
         reply_markup=get_main_keyboard(has_matrices=len(user_matrices) > 0)
     )
@@ -40,8 +64,11 @@ async def process_add_matrix(message: Message, state: FSMContext):
 
 @router.message(F.text == "📊 Вывести матрицу")
 async def process_show_matrix(message: Message):
+    user_id = message.from_user.id
+    user_matrices = get_user_matrices(user_id)
+    
     if not user_matrices:
-        await message.answer("Нет сохраненных матриц.")
+        await message.answer("У вас нет сохраненных матриц.")
         return
     
     await message.answer(
@@ -51,8 +78,11 @@ async def process_show_matrix(message: Message):
 
 @router.message(F.text == "🧮 Вычислить детерминант")
 async def process_determinant(message: Message):
+    user_id = message.from_user.id
+    user_matrices = get_user_matrices(user_id)
+    
     if not user_matrices:
-        await message.answer("Нет сохраненных матриц.")
+        await message.answer("У вас нет сохраненных матриц.")
         return
     
     await message.answer(
@@ -63,6 +93,16 @@ async def process_determinant(message: Message):
 @router.message(MatrixStates.waiting_for_name)
 async def process_matrix_name(message: Message, state: FSMContext):
     matrix_name = message.text.strip()
+    user_id = message.from_user.id
+    user_matrices = get_user_matrices(user_id)
+    
+    # Проверяем, есть ли уже матрица с таким именем
+    if matrix_name in user_matrices:
+        await message.answer(
+            f"Матрица с названием '{matrix_name}' уже существует. "
+            "Введите другое название:"
+        )
+        return
     
     await state.update_data(matrix_name=matrix_name)
     await state.set_state(MatrixStates.waiting_for_size)
@@ -94,6 +134,7 @@ async def process_size_selection(callback: CallbackQuery, state: FSMContext):
 
 @router.message(MatrixStates.waiting_for_rows)
 async def process_row_input(message: Message, state: FSMContext):
+    user_id = message.from_user.id
     user_data = await state.get_data()
     rows = user_data['rows']
     cols = user_data['cols']
@@ -126,16 +167,12 @@ async def process_row_input(message: Message, state: FSMContext):
             await message.answer(f"Введите {current_row + 1} строку:")
         else:
             # Сохраняем матрицу
-            # Ограничение на 10 матриц
-            if len(user_matrices) >= 10:
-                # Удаляем самую старую матрицу
-                oldest_key = next(iter(user_matrices))
-                del user_matrices[oldest_key]
-            
-            user_matrices[matrix_name] = matrix_data
+            save_user_matrix(user_id, matrix_name, matrix_data)
+            user_matrices = get_user_matrices(user_id)
             
             await message.answer(
-                f"✅ Матрица '{matrix_name}' успешно сохранена!",
+                f"✅ Матрица '{matrix_name}' успешно сохранена!\n"
+                f"Всего матриц: {len(user_matrices)}/10",
                 reply_markup=get_main_keyboard(has_matrices=len(user_matrices) > 0)
             )
             await state.clear()
@@ -145,6 +182,8 @@ async def process_row_input(message: Message, state: FSMContext):
 
 @router.callback_query(F.data.startswith("show_"))
 async def process_matrix_display(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    user_matrices = get_user_matrices(user_id)
     matrix_name = callback.data.split('_')[1]
     
     if matrix_name not in user_matrices:
@@ -166,6 +205,8 @@ async def process_matrix_display(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("det_"))
 async def process_determinant_calculation(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    user_matrices = get_user_matrices(user_id)
     matrix_name = callback.data.split('_')[1]
     
     if matrix_name not in user_matrices:
@@ -210,3 +251,23 @@ async def process_determinant_calculation(callback: CallbackQuery):
         )
     
     await callback.answer()
+
+@router.message(Command("my_matrices"))
+async def show_my_matrices(message: Message):
+    """Команда для просмотра статистики по матрицам пользователя"""
+    user_id = message.from_user.id
+    user_matrices = get_user_matrices(user_id)
+    
+    if not user_matrices:
+        await message.answer("У вас нет сохраненных матриц.")
+        return
+    
+    matrices_list = "📊 Ваши матрицы:\n\n"
+    for i, (name, data) in enumerate(user_matrices.items(), 1):
+        matrix_2d = convert_to_2d(data)
+        rows = len(matrix_2d)
+        cols = len(matrix_2d[0]) if matrix_2d else 0
+        matrices_list += f"{i}. {name} - размер: {rows}x{cols}\n"
+    
+    matrices_list += f"\nВсего матриц: {len(user_matrices)}/10"
+    await message.answer(matrices_list)
