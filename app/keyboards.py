@@ -17,19 +17,24 @@ def get_main_keyboard(has_matrices=False):
     return keyboard
 
 def get_size_keyboard():
-    # Создаем список строк для клавиатуры
+    # Создаем список строк для клавиатуры 5x5
     keyboard_lines = []
     
-    # Создаем кнопки 10x10
-    buttons = []
-    for i in range(1, 11):
+    # Создаем кнопки от 1x1 до 5x5
+    for i in range(1, 6):
         row_buttons = []
-        for j in range(1, 11):
+        for j in range(1, 6):
             row_buttons.append(InlineKeyboardButton(
                 text=f"{i}x{j}", 
                 callback_data=f"size_{i}_{j}"
             ))
         keyboard_lines.append(row_buttons)
+    
+    # Добавляем кнопку ручного ввода
+    keyboard_lines.append([InlineKeyboardButton(
+        text="⌨️ Ввести размер вручную", 
+        callback_data="manual_size"
+    )])
     
     return InlineKeyboardMarkup(inline_keyboard=keyboard_lines)
 
@@ -44,5 +49,22 @@ def get_matrices_list_keyboard(matrices_dict, action="show"):
             text=name, 
             callback_data=f"{action}_{name}"
         )])
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_delete_matrices_keyboard(matrices_dict):
+    """Клавиатура для удаления матриц"""
+    buttons = []
+    for name in matrices_dict.keys():
+        buttons.append([InlineKeyboardButton(
+            text=f"❌ {name}", 
+            callback_data=f"delete_{name}"
+        )])
+    
+    # Добавляем кнопку отмены
+    buttons.append([InlineKeyboardButton(
+        text="🔙 Отмена", 
+        callback_data="delete_cancel"
+    )])
     
     return InlineKeyboardMarkup(inline_keyboard=buttons)
