@@ -465,7 +465,7 @@ def matrix_multiply(matrix1, matrix2):
     rows2, cols2 = len(matrix2), len(matrix2[0])
     
     if cols1 != rows2:
-        print(f"Несовместимые размеры: {rows1}x{cols1} × {rows2}x{cols2}")
+        raise ValueError(f"Невозможно умножить матрицы: количество столбцов первой матрицы ({cols1}) должно равняться количеству строк второй матрицы ({rows2})")
     
     return [[sum(matrix1[i][k] * matrix2[k][j] for k in range(cols1)) 
              for j in range(cols2)] for i in range(rows1)]

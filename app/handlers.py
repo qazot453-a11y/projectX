@@ -7,10 +7,11 @@ from app.keyboards import (
     get_main_keyboard, get_size_keyboard, get_matrices_list_keyboard, 
     get_delete_matrices_keyboard, get_operations_keyboard, get_save_matrix_keyboard
 )
-from app.convert import convert_to_2d
+from app.convert import convert_to_2d, format_number
 from functions import (
     matrix_det, matrix_multiply_by_scalar, matrix_subtraction, matrix_add,
-    matrix_is_singular, matrix_transpose, matrix_algebraic_complement, matrix_inverse
+    matrix_is_singular, matrix_transpose, matrix_algebraic_complement, matrix_inverse,
+    matrix_multiply, matrix_rank
 )
 import re
 
@@ -53,10 +54,28 @@ def save_user_matrix(user_id, matrix_name, matrix_data):
     return user_matrices
 
 def format_matrix_output(matrix_2d, name="Результат"):
-    """Форматирует матрицу для вывода"""
-    matrix_str = f"Матрица '{name}':\n"
+    """Форматирует матрицу для вывода с красивым форматированием чисел"""
+    matrix_str = f"<b>Матрица '{name}':</b>\n"
+    matrix_str += "<pre>"
+    
+    # Находим максимальную ширину элемента для выравнивания
+    max_width = 0
     for row in matrix_2d:
-        matrix_str += "│ " + " ".join(f"{x:8.2f}" for x in row) + " │\n"
+        for element in row:
+            formatted = format_number(element)
+            max_width = max(max_width, len(formatted))
+    
+    # Форматируем каждую строку
+    for row in matrix_2d:
+        formatted_row = []
+        for element in row:
+            formatted_element = format_number(element)
+            # Выравниваем по правому краю
+            formatted_row.append(formatted_element.rjust(max_width))
+        
+        matrix_str += "│ " + " ".join(formatted_row) + " │\n"
+    
+    matrix_str += "</pre>"
     return matrix_str
 
 def convert_to_storage_format(matrix_2d):
@@ -186,11 +205,16 @@ async def process_operation_selection(callback: CallbackQuery, state: FSMContext
     
     await state.update_data(current_operation=operation)
     
-    if operation in ["add", "sub"]:
+    if operation in ["add", "sub", "multiply"]:
         # Операции с двумя матрицами
         await state.set_state(MatrixStates.waiting_for_first_matrix)
+        operation_names = {
+            "add": "Сложение",
+            "sub": "Вычитание", 
+            "multiply": "Умножение матриц"
+        }
         await callback.message.answer(
-            f"Выбрана операция: {'Сложение' if operation == 'add' else 'Вычитание'}\n"
+            f"Выбрана операция: {operation_names[operation]}\n"
             "Выберите первую матрицу:",
             reply_markup=get_matrices_list_keyboard(get_user_matrices(user_id), "select_first")
         )
@@ -210,7 +234,8 @@ async def process_operation_selection(callback: CallbackQuery, state: FSMContext
             "transpose": "Транспонирование",
             "inverse": "Обратная матрица",
             "complement": "Алгебраическое дополнение",
-            "singular": "Проверка на сингулярность"
+            "singular": "Проверка на сингулярность",
+            "rank": "Ранг матрицы"
         }
         await callback.message.answer(
             f"Выбрана операция: {operation_names[operation]}\n"
@@ -238,9 +263,18 @@ async def process_first_matrix_selection(callback: CallbackQuery, state: FSMCont
     }
     
     await state.set_state(MatrixStates.waiting_for_second_matrix)
+    
+    user_data = await state.get_data()
+    operation = user_data.get("current_operation")
+    operation_names = {
+        "add": "сложения",
+        "sub": "вычитания",
+        "multiply": "умножения"
+    }
+    
     await callback.message.answer(
         f"Выбрана матрица: {matrix_name}\n"
-        "Выберите вторую матрицу:",
+        f"Выберите вторую матрицу для {operation_names[operation]}:",
         reply_markup=get_matrices_list_keyboard(user_matrices, "select_second", matrix_name)
     )
     await callback.answer()
@@ -273,6 +307,9 @@ async def process_second_matrix_selection(callback: CallbackQuery, state: FSMCon
         elif operation == "sub":
             result = matrix_subtraction(matrix1_2d, matrix2_2d)
             result_name = f"Разность_{first_matrix_name}_{matrix_name}"
+        elif operation == "multiply":
+            result = matrix_multiply(matrix1_2d, matrix2_2d)
+            result_name = f"Произведение_{first_matrix_name}_{matrix_name}"
         
         # Форматируем результат
         result_str = format_matrix_output(result, result_name)
@@ -282,7 +319,7 @@ async def process_second_matrix_selection(callback: CallbackQuery, state: FSMCon
         operation_storage[user_id]["result_name"] = result_name
         
         await callback.message.answer(
-            f"<pre>{result_str}</pre>",
+            result_str,
             parse_mode='HTML',
             reply_markup=get_save_matrix_keyboard()
         )
@@ -319,7 +356,15 @@ async def process_single_matrix_selection(callback: CallbackQuery, state: FSMCon
             result = matrix_det(matrix_2d)
             await callback.message.answer(
                 f"🔢 Детерминант матрицы '{matrix_name}':\n"
-                f"<b>det = {result:.6f}</b>",
+                f"<b>det = {format_number(result)}</b>",
+                parse_mode='HTML'
+            )
+            
+        elif operation == "rank":
+            result = matrix_rank(matrix_2d)
+            await callback.message.answer(
+                f"📈 Ранг матрицы '{matrix_name}':\n"
+                f"<b>rank = {result}</b>",
                 parse_mode='HTML'
             )
             
@@ -334,7 +379,7 @@ async def process_single_matrix_selection(callback: CallbackQuery, state: FSMCon
             }
             
             await callback.message.answer(
-                f"<pre>{result_str}</pre>",
+                result_str,
                 parse_mode='HTML',
                 reply_markup=get_save_matrix_keyboard()
             )
@@ -349,7 +394,7 @@ async def process_single_matrix_selection(callback: CallbackQuery, state: FSMCon
             }
             
             await callback.message.answer(
-                f"<pre>{result_str}</pre>",
+                result_str,
                 parse_mode='HTML',
                 reply_markup=get_save_matrix_keyboard()
             )
@@ -364,7 +409,7 @@ async def process_single_matrix_selection(callback: CallbackQuery, state: FSMCon
             }
             
             await callback.message.answer(
-                f"<pre>{result_str}</pre>",
+                result_str,
                 parse_mode='HTML',
                 reply_markup=get_save_matrix_keyboard()
             )
@@ -417,7 +462,7 @@ async def process_scalar_input(message: Message, state: FSMContext):
         
         matrix_2d = convert_to_2d(matrix_data)
         result = matrix_multiply_by_scalar(matrix_2d, scalar)
-        result_name = f"Умноженная_на_{scalar}_{matrix_name}"
+        result_name = f"Умноженная_на_{format_number(scalar)}_{matrix_name}"
         
         result_str = format_matrix_output(result, result_name)
         
@@ -426,7 +471,7 @@ async def process_scalar_input(message: Message, state: FSMContext):
         operation_storage[user_id]["result_name"] = result_name
         
         await message.answer(
-            f"<pre>{result_str}</pre>",
+            result_str,
             parse_mode='HTML',
             reply_markup=get_save_matrix_keyboard()
         )
@@ -503,6 +548,8 @@ async def process_operation_cancel(callback: CallbackQuery, state: FSMContext):
 async def process_delete_cancel(callback: CallbackQuery):
     await callback.message.answer("Удаление отменено.")
     await callback.answer()
+
+# ... (остальные обработчики остаются без изменений)
 
 @router.message(MatrixStates.waiting_for_name)
 async def process_matrix_name(message: Message, state: FSMContext):
@@ -663,7 +710,7 @@ async def process_matrix_display(callback: CallbackQuery):
     # Форматируем вывод
     matrix_str = format_matrix_output(matrix_2d, matrix_name)
     
-    await callback.message.answer(f"<pre>{matrix_str}</pre>", parse_mode='HTML')
+    await callback.message.answer(matrix_str, parse_mode='HTML')
     await callback.answer()
 
 @router.callback_query(F.data.startswith("delete_"))

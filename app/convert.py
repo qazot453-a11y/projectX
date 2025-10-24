@@ -19,3 +19,10 @@ def convert_to_2d(matrix_data):
         matrix_2d.append(current_row)
     
     return matrix_2d
+
+def format_number(x):
+    """Форматирует число: выводит целую часть если число целое, иначе 2 знака после запятой"""
+    if x == int(x):
+        return str(int(x))
+    else:
+        return f"{x:.2f}".rstrip('0').rstrip('.')

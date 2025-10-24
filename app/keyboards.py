@@ -19,14 +19,16 @@ def get_main_keyboard(has_matrices=False):
 def get_operations_keyboard():
     """Клавиатура с операциями над матрицами"""
     keyboard_lines = [
-        [InlineKeyboardButton(text="🔢 Детерминант", callback_data="op_det")],
-        [InlineKeyboardButton(text="✖️ Умножить на скаляр", callback_data="op_scalar")],
-        [InlineKeyboardButton(text="➕ Сложение", callback_data="op_add")],
-        [InlineKeyboardButton(text="➖ Вычитание", callback_data="op_sub")],
-        [InlineKeyboardButton(text="🔄 Транспонирование", callback_data="op_transpose")],
-        [InlineKeyboardButton(text="🔄 Обратная матрица", callback_data="op_inverse")],
-        [InlineKeyboardButton(text="📐 Алгебраическое дополнение", callback_data="op_complement")],
-        [InlineKeyboardButton(text="❓ Проверка на сингулярность", callback_data="op_singular")],
+        [InlineKeyboardButton(text="🔢 Детерминант", callback_data="op_det"),
+         InlineKeyboardButton(text="📈 Ранг матрицы", callback_data="op_rank")],
+        [InlineKeyboardButton(text="✖️ Умножить на скаляр", callback_data="op_scalar"),
+         InlineKeyboardButton(text="❓ Сингулярность", callback_data="op_singular")],
+        [InlineKeyboardButton(text="➕ Сложение", callback_data="op_add"),
+         InlineKeyboardButton(text="➖ Вычитание", callback_data="op_sub")],
+        [InlineKeyboardButton(text="✖️ Умножение матриц", callback_data="op_multiply")],
+        [InlineKeyboardButton(text="🔄 Транспонирование", callback_data="op_transpose"),
+         InlineKeyboardButton(text="🔄 Обратная матрица", callback_data="op_inverse")],
+        [InlineKeyboardButton(text="📐 Алг. дополнение", callback_data="op_complement")],
         [InlineKeyboardButton(text="🔙 Назад", callback_data="op_back")]
     ]
     
