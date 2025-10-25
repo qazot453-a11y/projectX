@@ -386,6 +386,91 @@ def zero_matrix() -> list[list[float]]:
     return zero_matrix
 
 
+def matrix_rank(matrix, tolerance=1e-12):
+    """
+    Вычисляет ранг матрицы методом Гаусса (приведение к ступенчатому виду)
+    
+    Args:
+        matrix: матрица (list[list[float]])
+        tolerance: точность для определения нулевых элементов
+    
+    Returns:
+        int: ранг матрицы
+    """
+    if not matrix or not matrix[0]:
+        return 0
+    
+    # Создаем копию матрицы, чтобы не изменять исходную
+    mat = [row[:] for row in matrix]
+    rows = len(mat)
+    cols = len(mat[0])
+    
+    rank = 0
+    pivot_row = 0
+    pivot_col = 0
+    
+    while pivot_row < rows and pivot_col < cols:
+        # Ищем опорный элемент (ненулевой) в текущем столбце
+        pivot_index = -1
+        for i in range(pivot_row, rows):
+            if abs(mat[i][pivot_col]) > tolerance:
+                pivot_index = i
+                break
+        
+        if pivot_index == -1:
+            # Все элементы в столбце нулевые, переходим к следующему столбцу
+            pivot_col += 1
+            continue
+        
+        # Меняем строки местами, если нужно
+        if pivot_index != pivot_row:
+            mat[pivot_row], mat[pivot_index] = mat[pivot_index], mat[pivot_row]
+        
+        # Нормализуем опорную строку (делаем опорный элемент равным 1)
+        pivot_value = mat[pivot_row][pivot_col]
+        if abs(pivot_value) > tolerance:
+            for j in range(pivot_col, cols):
+                mat[pivot_row][j] /= pivot_value
+        
+        # Обнуляем элементы ниже опорного в текущем столбце
+        for i in range(pivot_row + 1, rows):
+            factor = mat[i][pivot_col]
+            if abs(factor) > tolerance:
+                for j in range(pivot_col, cols):
+                    mat[i][j] -= factor * mat[pivot_row][j]
+        
+        # Переходим к следующей строке и столбцу
+        pivot_row += 1
+        pivot_col += 1
+        rank += 1
+    
+    return rank
+
+
+def matrix_multiply(matrix1, matrix2):
+    """
+    Умножает две матрицы: matrix1 × matrix2
+    
+    Args:
+        matrix1: первая матрица (list[list[float]])
+        matrix2: вторая матрица (list[list[float]])
+    
+    Returns:
+        list[list[float]]: произведение матриц
+    """
+    if not matrix1 or not matrix2:
+        raise ValueError("Матрицы не могут быть пустыми")
+    
+    rows1, cols1 = len(matrix1), len(matrix1[0])
+    rows2, cols2 = len(matrix2), len(matrix2[0])
+    
+    if cols1 != rows2:
+        raise ValueError(f"Невозможно умножить матрицы: количество столбцов первой матрицы ({cols1}) должно равняться количеству строк второй матрицы ({rows2})")
+    
+    return [[sum(matrix1[i][k] * matrix2[k][j] for k in range(cols1)) 
+             for j in range(cols2)] for i in range(rows1)]
+
+
 def print_matrix(matrix:list[list[float]]) -> None:
     """
     Красивый вывод матрицы
