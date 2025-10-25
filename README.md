@@ -8,3 +8,5 @@ Readme!
 Для functions.py:
     Функция matrix_det() выводится через обычный print
     Функции вида matrix_математическая_операция() выводятся через print_matrix()
+
+Ссылка на бота: <https://t.me/MMMatrix_calculator_bot>
